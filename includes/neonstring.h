@@ -1,16 +1,16 @@
 #pragma once
 
-struct nestring {
+struct neonstring {
 	size_t length;
 	size_t capacity;
 	char *data;
-};
+} __attribute__((packed));
 
-typedef struct nestring nestring_t;
+typedef struct neonstring neonstring_t;
 
-nestring_t *string_new(char *restrict data, size_t capacity);
-void string_free(nestring_t *string);
-void string_assign(nestring_t *string, char *restrict data);
-void string_append(nestring_t *string, char *restrict data);
-size_t string_push(nestring_t *string, char c);
-char string_pop(nestring_t *string);
+neonstring_t *neonstring_new(char *restrict data, size_t capacity);
+void neonstring_free(neonstring_t *string);
+void neonstring_assign(neonstring_t *string, char *restrict data);
+void neonstring_append(neonstring_t *string, char *restrict data);
+size_t neonstring_push(neonstring_t *string, char c);
+char neonstring_pop(neonstring_t *string);

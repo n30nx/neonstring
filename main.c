@@ -4,22 +4,22 @@
 #include "includes/neonstring.h"
 
 int main(void) {
-	nestring_t *string = string_new("Hello World", 0);
+	neonstring_t *string = neonstring_new("Hello World", 2);
 	printf("%s\n", string->data);
 
-	string_assign(string, "asdabc");
+	neonstring_assign(string, "asdabc");
 	printf("%s\n", string->data);
 
-	char x = string_pop(string);
+	char x = neonstring_pop(string);
 	printf("%c %s\n", x, string->data);
 
-	size_t size = string_push(string, 'q');
+	size_t size = neonstring_push(string, 'q');
 	printf("%zu %s\n", size, string->data);
 
-	string_append(string, "wwwwqqqq");
+	neonstring_append(string, "wwwwqqqq");
 	printf("%zu %zu %s\n", string->length, string->capacity, string->data);
 
-	free(string);
+	neonstring_free(string);
 
 	return 0;
 }
