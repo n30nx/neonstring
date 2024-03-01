@@ -7,32 +7,77 @@
 
 #define CAPACITY 512
 
+#ifdef DEBUG
+#define debug(fmt, ...) do {									\
+		fprintf(stdout, "%s:%s:%d: ", __FILE__, __FUNCTION__, __LINE__);	\
+		fprintf(stdout, fmt, __VA_ARGS__);								\
+		fprintf(stdout, "\n");											\
+} while (0)
+#else
+#define debug(...)
+#endif
+
+static const int log_table[64] = {
+    63,  0, 58,  1, 59, 47, 53,  2,
+    60, 39, 48, 27, 54, 33, 42,  3,
+    61, 51, 37, 40, 49, 18, 28, 20,
+    55, 30, 34, 11, 43, 14, 22,  4,
+    62, 57, 46, 52, 38, 26, 32, 41,
+    50, 36, 17, 19, 29, 10, 13, 21,
+    56, 45, 25, 31, 35, 16,  9, 12,
+    44, 24, 15,  8, 23,  7,  6,  5
+};
+
+/*
+ * de Brujin sequence
+ * http://supertech.csail.mit.edu/papers/debruijn.pdf
+ */
+__attribute__((always_inline))
+static inline int u64_log2(size_t cap) {
+	cap |= cap >> 1;
+    cap |= cap >> 2;
+    cap |= cap >> 4;
+    cap |= cap >> 8;
+    cap |= cap >> 16;
+    cap |= cap >> 32;
+    return log_table[((cap - (cap >> 1)) * 0x07EDD5E59A4E28C2) >> 58];
+}
+
+__attribute__((always_inline))
 static inline size_t round_capacity(size_t capacity) {
-	capacity--;
-	capacity |= capacity >> 1;
-	capacity |= capacity >> 2;
-	capacity |= capacity >> 4;
-	capacity |= capacity >> 8;
-	capacity |= capacity >> 16;
-	capacity++;
+	size_t cur = capacity;
+	debug("cur: %ld", cur);	
+
+	int log_cap = u64_log2(capacity);
+	capacity = 1 << ((size_t)log_cap + 1);
+	debug("capacity: %ld", capacity);
+
+	if (cur >= capacity) {
+		return 0;
+	}
 
 	return capacity;
 }
 
-static inline bool check_capacity(nestring_t *string, size_t size) {
+__attribute__((always_inline))
+static inline bool check_capacity(neonstring_t *string, size_t size) {
 	return (string->capacity > (string->length + size)) ? true : false;
 }
 
-static nestring_t *string_alloc(size_t capacity) {
+static neonstring_t *neonstring_alloc(size_t capacity) {
 	capacity = capacity ? round_capacity(capacity) : CAPACITY;
 
-	nestring_t *string = (nestring_t*)malloc(sizeof(nestring_t));
+	neonstring_t *string = (neonstring_t*)malloc(sizeof(neonstring_t));
 	if (string == NULL) {
 		fprintf(stderr, "Wasn't able to allocate a string!\n");
 		exit(1);
 	}
 
 	string->data = (char*)malloc(sizeof(char) * capacity);
+	if (string->data == NULL) {
+		fprintf(stderr, "Wasn't able to allocate data in a string!\n");
+		exit(1);
+	}
 	memset(string->data, 0, capacity);
 
 	string->capacity = capacity;
@@ -41,22 +86,29 @@ static nestring_t *string_alloc(size_t capacity) {
 	return string;
 }
 
-static void string_realloc(nestring_t *string, size_t minimum_size) {
+static void neonstring_realloc(neonstring_t *string, size_t minimum_size) {
+	size_t before = minimum_size;
 	minimum_size = round_capacity(minimum_size);
-	string->data = (char*)realloc(string->data, minimum_size);
+	if (minimum_size == 0) {
+		fprintf(stderr, "Cannot allocate a bigger string than size %ld\n", before);
+		exit(1);
+	}
+	debug("minimum_size: %ld", minimum_size);
+	string->data = (char*)realloc(string->data, sizeof(char) * minimum_size);
 	if (string->data == NULL) {
 		fprintf(stderr, "Wasn't able to realloc the string!\n");
 		exit(1);
 	}
 
 	string->capacity = minimum_size;
-	memset(string->data + string->capacity, 0, minimum_size);
+	memset(string->data + string->length, 0, minimum_size - string->length);
 }
 
-void string_assign(nestring_t *string, char *restrict data) {
+void neonstring_assign(neonstring_t *string, char *restrict data) {
 	size_t data_length = strlen(data);
-	if (!check_capacity(string, data_length)) {
-		string_realloc(string, string->capacity + data_length);
+	if (string->capacity < data_length - 1) {
+		debug("realloc: %s %ld %ld %ld", string->data, string->capacity, string->length, data_length);
+		neonstring_realloc(string, string->capacity + data_length);
 	}
 
 	size_t cur_length = string->length;
@@ -68,17 +120,17 @@ void string_assign(nestring_t *string, char *restrict data) {
 	memcpy(string->data, data, data_length);
 }
 
-nestring_t *string_new(char *restrict data, size_t capacity) {
-	nestring_t *string = string_alloc(capacity);
-	string_assign(string, data);
+neonstring_t *neonstring_new(char *restrict data, size_t capacity) {
+	neonstring_t *string = neonstring_alloc(capacity);
+	neonstring_assign(string, data);
 
 	return string;
 }
 
-void string_append(nestring_t *string, char *restrict data) {
+void neonstring_append(neonstring_t *string, char *restrict data) {
 	size_t data_length = strlen(data);
 	if (!check_capacity(string, string->length + data_length)) {
-		string_realloc(string, string->capacity + data_length);
+		neonstring_realloc(string, string->capacity + data_length);
 	}
 
 	size_t cur_length = string->length;
@@ -87,14 +139,14 @@ void string_append(nestring_t *string, char *restrict data) {
 	memcpy(string->data + cur_length, data, data_length);
 }
 
-void string_free(nestring_t *string) {
+void neonstring_free(neonstring_t *string) {
 	free(string->data);
 	free(string);
 }
 
-size_t string_push(nestring_t *string, char c) {
+size_t neonstring_push(neonstring_t *string, char c) {
 	if (!check_capacity(string, 1)) {
-		string_realloc(string, string->capacity + 1);
+		neonstring_realloc(string, string->capacity + 1);
 	}
 	string->data[string->length] = c;
 	string->length++;
@@ -102,7 +154,7 @@ size_t string_push(nestring_t *string, char c) {
 	return string->length;
 }
 
-char string_pop(nestring_t *string) {
+char neonstring_pop(neonstring_t *string) {
 	char c = string->data[string->length - 1];
 	string->data[string->length - 1] = 0;
 
