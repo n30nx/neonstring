@@ -1,9 +1,9 @@
 #pragma once
 
 struct neonstring {
-	size_t length;
-	size_t capacity;
-	char *data;
+    size_t length;
+    size_t capacity;
+    char *data;
 } __attribute__((packed));
 
 typedef struct neonstring neonstring_t;
